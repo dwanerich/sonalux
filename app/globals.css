@@ -1,6 +1,7 @@
 /* === SONALUX THEME v0 (murdered-out) === */
 :root{
   --bg: #000;
+  
   --panel: #050505;
   --text: #eaeaf2;
   --muted: rgba(234,234,242,0.65);

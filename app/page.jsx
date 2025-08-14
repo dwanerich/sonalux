@@ -84,12 +84,12 @@ export default function ThemePage() {
             <h2 className="slx-section">Player</h2>
             <div className="slx-cover" style={{ height: 180, marginBottom: 12 }} />
             {/* Ensure this ID exists so RemixModule can set src */}
-            <audio
+            {/* <audio
               id="site-player"
               controls
               style={{ width: '100%' }}
               onContextMenu={(e) => e.preventDefault()}
-            />
+            /> */}
           </div>
         </div>
       </section>

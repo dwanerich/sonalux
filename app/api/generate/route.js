@@ -131,6 +131,16 @@ export async function POST(req) {
     let inputPath = null;
     if (form) {
       const file = form.get('audio') || form.get('file');
+
+      let neighbors = [];
+    if (file) {
+      const audioF32 = await decodeUploadToMonoF32(file); // your decode helper
+      const qVec = await embedAudioOpenL3(audioF32);
+      neighbors = search(IDX, qVec, /*k=*/5, /*ef*/64)              // [{id, score}]
+        .map(({id, score}) => ({ refId: embeds[id].id, score }));   // map back to ref ids
+    }
+
+      
       if (file && typeof file.arrayBuffer === 'function') {
         inputPath = await saveUpload(file);
         // non-blocking duplicate record

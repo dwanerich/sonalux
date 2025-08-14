@@ -2,7 +2,7 @@ import './globals.css';
 import Link from 'next/link';
 // import TermsPopup from '@/components/ui/TermsPopup';
 
-export const metadata = { title: 'Sonalux Audio', description: 'Genre·Mood·Intensity repattern engine' };
+export const metadata = { title: 'SONALUX AI', description: 'Genre·Mood·Intensity repattern engine' };
 
 export default function RootLayout({ children }) {
   return (
@@ -10,7 +10,7 @@ export default function RootLayout({ children }) {
       <body>
         <header className="header">
           <div className="header-inner">
-            <div className="logo">SONALUX <span className="tag">LABS</span></div>
+            <div className="logo">SONALUX <span className="tag">AI</span></div>
             <nav className="nav">
               <Link href="/">Home</Link><Link href="/packs">Packs</Link><Link href="/bank">Bank</Link>
             <Link href="/">Lab</Link>
