@@ -1,5 +1,6 @@
 import './globals.css';
 import Link from 'next/link';
+// import TermsPopup from '@/components/ui/TermsPopup';
 
 export const metadata = { title: 'Sonalux Audio', description: 'Genre·Mood·Intensity repattern engine' };
 
@@ -12,13 +13,14 @@ export default function RootLayout({ children }) {
             <div className="logo">SONALUX <span className="tag">LABS</span></div>
             <nav className="nav">
               <Link href="/">Home</Link><Link href="/packs">Packs</Link><Link href="/bank">Bank</Link>
+            <Link href="/">Lab</Link>
               {/* <Link href="/api/health">Health</Link> */}
-              <a href="https://example.com" target="_blank" rel="noreferrer">Docs</a>
+              {/* <a href="https://example.com" target="_blank" rel="noreferrer">Docs</a> */}
             </nav>
           </div>
         </header>
-        <TermsGate />
         <main className="main">{children}</main>
+        {/* <TermsPopup /> */}
         <PlayerBar />
       </body>
     </html>
