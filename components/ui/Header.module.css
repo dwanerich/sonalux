@@ -1,0 +1,43 @@
+.header {
+  width: 100%;
+  background-color: #0a0a0a;
+  padding: 20px 40px;
+  border-bottom: 1px solid #222;
+  display: flex;
+  justify-content: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+.nav {
+  max-width: 1200px;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 20px;
+  color: #00e584;
+  text-decoration: none;
+  letter-spacing: 1px;
+}
+
+.links {
+  display: flex;
+  gap: 24px;
+}
+
+.links a {
+  color: #bbb;
+  text-decoration: none;
+  font-size: 16px;
+  transition: color 0.2s ease;
+}
+
+.links a:hover {
+  color: white;
+}

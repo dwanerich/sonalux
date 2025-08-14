@@ -1,0 +1,11 @@
+.backdrop{
+  position:fixed;inset:0;background:rgba(0,0,0,.5);backdrop-filter:blur(2px);
+  display:grid;place-items:center;z-index:50
+}
+.card{
+  width:min(920px,92vw);border-radius:16px;border:1px solid var(--lux-stroke);
+  background:linear-gradient(180deg, rgba(255,255,255,.03), rgba(0,0,0,.35)), var(--lux-panel-2);
+  box-shadow:var(--shadow-1)
+}
+.head{padding:14px 16px;border-bottom:1px solid var(--lux-line);font-weight:600}
+.body{padding:16px}

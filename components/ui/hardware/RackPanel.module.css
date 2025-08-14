@@ -1,0 +1,60 @@
+.rackPanel {
+  position: relative;
+  width: 100%;
+  max-width: 1180px;
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 0 40px rgba(0,0,0,.6);
+  /* Let height be driven by the contained image, not forced aspect */
+}
+
+/* background holder that centers the PNG without cropping */
+.bg {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(1200px 400px at 50% -200px, rgba(0,229,255,.08), transparent 60%),
+    linear-gradient(180deg, rgba(0,0,0,.9), rgba(0,0,0,.92));
+}
+
+/* panel image: fully visible, never cropped */
+.bgImg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;         /* key: never crop */
+  display: block;
+  filter: drop-shadow(0 14px 40px rgba(0,0,0,.55));
+}
+
+/* Grid overlay on top of the image; add safe padding so UI doesn’t touch edges */
+.rackGrid {
+  position: absolute;
+  inset: 0;
+  padding: 16px 18px;
+  display: grid;
+
+  /* Rows: LCD screen, controls row (knobs+upload), bottom row (fader+vocal+generate) */
+  grid-template-rows: 1fr 1.2fr 1fr;
+  grid-template-columns: 1.1fr 1.1fr 0.9fr;
+  gap: 12px 18px;
+  align-items: center;
+  pointer-events: none;        /* UI children re-enable events */
+}
+
+.rackGrid > * { pointer-events: auto; }
+
+/* Span helpers */
+.span3 { grid-column: 1 / 4; }
+.span2 { grid-column: 1 / 3; }
+
+/* Responsive: keep compact, avoid vertical scroll on common laptops */
+@media (max-width: 1180px) {
+  .rackPanel { max-width: 1080px; }
+}
+@media (max-width: 1080px) {
+  .rackPanel { max-width: 980px; }
+  .rackGrid { grid-template-rows: 1fr 1.4fr 1fr; }
+}

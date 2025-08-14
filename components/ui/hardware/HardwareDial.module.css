@@ -1,0 +1,37 @@
+.dialWrapper {
+  display: grid;
+  place-items: center;
+  gap: 6px;
+}
+
+.dial {
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  cursor: grab;
+  transition: transform 0.04s linear;
+  border-radius: 50%;
+  /* hardware depth */
+  box-shadow:
+    inset 0 2px 6px rgba(0,0,0,.55),
+    0 8px 22px rgba(0,0,0,.5);
+  position: relative;
+}
+.dial::after {
+  content: "";
+  position: absolute; inset: -2px;
+  border-radius: 50%;
+  background:
+    radial-gradient(120px 40px at 50% 10%, rgba(255,255,255,.08), transparent 60%);
+  pointer-events: none;
+}
+
+.label {
+  font-size: 12px;
+  letter-spacing: .16em;
+  color: #BFEFFF;
+  text-transform: uppercase;
+  opacity: .9;
+  font-family: 'Orbitron', sans-serif;
+}
+

@@ -1,0 +1,77 @@
+# -----------------------
+# Core Node / Next.js
+# -----------------------
+node_modules/
+.next/
+out/
+build/
+dist/
+.cache/
+tmp/
+temp/
+
+# -----------------------
+# Local Env & Secrets
+# -----------------------
+.env
+.env.*
+!.env.example
+
+# -----------------------
+# OS & Editor Files
+# -----------------------
+.DS_Store
+Thumbs.db
+*.log
+*.swp
+*.swo
+*.tmp
+.vscode/
+.idea/
+*.bak
+
+# -----------------------
+# Large / Binary Assets
+# -----------------------
+# Common audio & music files
+*.mp3
+*.wav
+*.aiff
+*.flac
+*.ogg
+*.m4a
+
+# Common video files
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# Common image formats
+*.png
+*.jpg
+*.jpeg
+*.tiff
+*.bmp
+*.gif
+*.heic
+*.raw
+*.psd
+
+# Archives / compressed
+*.zip
+*.tar
+*.gz
+*.7z
+*.rar
+
+# -----------------------
+# AI / Data Files
+# -----------------------
+# Large datasets
+*.csv
+*.tsv
+*.json
+*.jsonl
+*.xls*

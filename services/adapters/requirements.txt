@@ -1,0 +1,7 @@
+
+basic-pitch
+pretty_midi
+mido
+numpy
+soundfile
+librosa
