@@ -13,6 +13,10 @@ IDS_FN   = os.path.join(IDX_DIR, "ids.txt")
 FAISS_FN = os.path.join(IDX_DIR, "bank.faiss")
 
 app = FastAPI()
+@app.get("/health")
+def health():
+    return {"ok": True}
+
 os.makedirs(BANK_DIR, exist_ok=True)
 os.makedirs(IDX_DIR, exist_ok=True)
 

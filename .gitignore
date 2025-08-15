@@ -75,3 +75,16 @@ Thumbs.db
 *.json
 *.jsonl
 *.xls*
+/public/sessions/
+# runtime + caches
+.venv/
+.venv-*/
+node_modules/
+public/sessions/
+**/__pycache__/
+*.pyc
+.DS_Store
+
+# local env files
+.env
+.env.*

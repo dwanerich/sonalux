@@ -7,23 +7,6 @@ import { regenerateDrums } from '../drums/regenerateDrums.js';
 import { applyWatermark } from '../utils/watermark.js';
 import { computeSections } from './sectionizer.js';
 import { spawn } from 'node:child_process';
-// at top of the file
-import ffmpegStatic from 'ffmpeg-static';
-import ffprobeStatic from 'ffprobe-static';
-// resolve paths; allow override via env if you later install brew ffmpeg
-const FFMPEG  = process.env.FFMPEG_BIN  || ffmpegStatic;
-const FFPROBE = process.env.FFPROBE_BIN || ffprobeStatic.path;
-
-// example wrapper (use your existing spawn/sh helper)
-import { spawn } from 'node:child_process';
-function sh(bin, args) {
-  const cmd = bin === 'ffmpeg' ? FFMPEG : bin === 'ffprobe' ? FFPROBE : bin;
-  return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { stdio: 'inherit' });
-    p.on('close', (code) => code === 0 ? resolve() : reject(new Error(`${cmd} exit ${code}`)));
-  });
-}
-
 
 async function ensureSession(dir) { await mkdir(dir, { recursive: true }); }
 
