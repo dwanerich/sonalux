@@ -1,13 +1,8 @@
-'use server';
-
 import path from 'node:path';
-import { mkdir, writeFile, readFile, readdir, stat } from 'node:fs/promises';
+import { mkdir, writeFile, readFile, readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import ffmpegStatic from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
-import { getDspMatrix } from './engine/dsp/matrixRouter.js';
-console.log(getDspMatrix({ profile: 'punch', I: -12, TP: -1.0 }).filtergraph);
-
 
 // ---------- CONFIG / ENV ----------
 const EMB_URL  = process.env.EMB_URL  || 'http://localhost:8001';      // FastAPI embeddings
@@ -23,20 +18,6 @@ function sh(bin, args) {
     const p = spawn(cmd, args, { stdio: 'inherit' });
     p.on('close', code => code === 0 ? resolve() : reject(new Error(`${cmd} exit ${code}`)));
   });
-}
-
-async function getDspMatrix(profile = 'clean', I = -12, TP = -1.0) {
-  try {
-    const r = await fetch(`${BASE_URL}/api/dsp/matrix`, {
-      method: 'POST',
-      headers: { 'content-type':'application/json' },
-      body: JSON.stringify({ profile, I, TP })
-    });
-    const j = await r.json();
-    return j?.filtergraph || null;
-  } catch {
-    return null;
-  }
 }
 
 async function ensureDir(p){ await mkdir(p, { recursive: true }); }
@@ -121,23 +102,27 @@ async function mixSection(outPath, drumsPath, otherPaths = []) {
   ]);
 }
 
+// ---- Option A: inline, safe mastering chain (no DSP import) ----
 async function finalMixdown(inWav, finalWav, finalMp3, guide, profile = 'clean') {
   const I  = guide?.mix_targets?.lufs_i       ?? -12;
   const TP = guide?.mix_targets?.true_peak_db ?? -1.0;
+  const limit = Math.min(0.89, Math.pow(10, TP/20));
+  const base = `loudnorm=I=${I}:TP=${TP}:LRA=7`;
 
-  // Try to get a profile-specific filtergraph from the matrix router
-  const fg = await getDspMatrix(profile, I, TP);
-  const filtergraph = fg || `loudnorm=I=${I}:TP=${TP}:LRA=7,alimiter=limit=${Math.min(0.89, Math.pow(10, TP/20))}`;
+  // tiny profile variations (optional); fallback is just base + limiter
+  const chains = {
+    clean: `${base},alimiter=limit=${limit}`,
+    gloss: `${base},highshelf=f=8000:g=1.5,alimiter=limit=${limit}`,
+    punch: `${base},acompressor=threshold=-16dB:ratio=3:attack=5:release=60,alimiter=limit=${limit}`
+  };
+  const filtergraph = chains[profile] || chains.clean;
 
   await sh('ffmpeg', ['-y','-i', inWav, '-filter_complex', filtergraph, '-c:a','pcm_s16le', finalWav]);
   await sh('ffmpeg', ['-y','-i', finalWav, '-c:a','libmp3lame','-q:a','2', finalMp3]);
 }
 
-// map Clean/Bold/Rebel → matrix profiles
+// map Clean/Bold/Rebel → matrix profiles (used by finalMixdown)
 const levelToProfile = { Clean: 'clean', Bold: 'gloss', Rebel: 'punch' };
-// ...
-await finalMixdown(finalPre, finalWav, finalMp3, guide, levelToProfile[lvl.level] || 'clean');
-
 
 // ---------- MAIN ENTRY: post-runFlip wildcard pass ----------
 /**
@@ -173,7 +158,6 @@ export async function wildcardPostProcess({ sessionDir, intensity = 50, moods = 
     for (const s of secDirs) {
       const secMix = path.join(s.dir, 'sec_mix.wav');
       const wildOut = path.join(s.dir, 'sec_mix_wild.wav');
-      // copy (stream copy)
       await sh('ffmpeg', ['-y','-i', secMix, '-c','copy', wildOut]);
       secWild.push(wildOut);
     }
@@ -202,12 +186,11 @@ export async function wildcardPostProcess({ sessionDir, intensity = 50, moods = 
   const secWildPaths = [];
 
   for (const s of secDirs) {
-    // discover files
     const files = (await readdir(s.dir)).filter(n => n.endsWith('.wav'));
     const baselineDrums = files.includes('drums.wav') ? path.join(s.dir, 'drums.wav') : null;
     const otherPaths = ['bass.wav','vox.wav','other.wav'].filter(n => files.includes(n)).map(n => path.join(s.dir, n));
 
-    // candidates: any drums*.wav except baseline
+    // candidates: any drums*.wav except baseline and section mixes
     const candNames = files
       .filter(n => /^drums.*\.wav$/i.test(n) && n !== 'drums.wav' && n !== 'sec_mix.wav' && n !== 'sec_mix_wild.wav');
     const candidateFiles = candNames.slice(0, lvl.candidatesMax).map(n => path.join(s.dir, n));
@@ -232,9 +215,7 @@ export async function wildcardPostProcess({ sessionDir, intensity = 50, moods = 
           if (improved) chosenDrums = candidateFiles[bestIdx];
         }
       }
-    } catch (e) {
-      // silent: keep baseline
-    }
+    } catch (e) { /* keep baseline on errors */ }
 
     decisions.push(decision);
 
@@ -252,7 +233,7 @@ export async function wildcardPostProcess({ sessionDir, intensity = 50, moods = 
 
   const finalWav = path.join(sessionDir, 'final_wild.wav');
   const finalMp3 = path.join(sessionDir, 'final_wild.mp3');
-  await finalMixdown(finalPre, finalWav, finalMp3, guide);
+  await finalMixdown(finalPre, finalWav, finalMp3, guide, levelToProfile[lvl.level] || 'clean');
 
   // 5) Telemetry
   const wins = decisions.filter(d => d.improved).length;

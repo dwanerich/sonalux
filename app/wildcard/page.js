@@ -28,12 +28,13 @@ export default function WildcardPage() {
     fd.append('wildcard', String(wildcard));
     fd.append('moods', moods.join(',')); // simple CSV
 
-    const r = await fetch('/api/wildcard-upload', { method: 'POST', body: fd });
-    const j = await r.json();
-    if (!r.ok || !j.ok) {
-      setStatus('Error: ' + (j.error || r.statusText));
-      return;
-    }
+    const r = await fetch('/api/wild-card-upload', { method: 'POST', body: fd });
+    const ctype = r.headers.get('content-type') || '';
+    const j = ctype.includes('application/json') ? await r.json() : null;
+    if (!r.ok || !j?.ok) {
+    throw new Error(j?.error || `HTTP ${r.status}`);
+}
+
     setResult(j);
     setStatus('Done');
   }

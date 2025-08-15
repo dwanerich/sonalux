@@ -1,4 +1,4 @@
-'use server';
+// engine/orchestrator/runFlip.js  (no 'use server' header)
 
 import path from 'node:path';
 import { mkdir, writeFile, readFile } from 'node:fs/promises';
@@ -18,7 +18,7 @@ async function convertToWav(inputFile, outDir) {
 
 async function ffprobeDuration(p){
   const { out } = await sh('ffprobe', ['-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1', p]);
-  return Math.max(0, parseFloat(out.trim() || '0'));
+  return Math.max(0, parseFloat((out || '').trim() || '0'));
 }
 
 async function splitDemucsRequired(inputWav, outDir, requireSplit) {
@@ -30,8 +30,8 @@ async function splitDemucsRequired(inputWav, outDir, requireSplit) {
   const d = path.join(outDir, base);
   return {
     drums: path.join(d, 'drums.wav'),
-    bass: path.join(d, 'bass.wav'),
-    vox: path.join(d, 'vocals.wav'),
+    bass:  path.join(d, 'bass.wav'),
+    vox:   path.join(d, 'vocals.wav'),
     other: path.join(d, 'other.wav')
   };
 }
@@ -42,7 +42,7 @@ async function passthroughToWav(inFile, outFile) {
 
 async function loadGuide(rsgId) {
   try {
-    const [genre, mood] = String(rsgId).split(':');
+    const [genre, mood] = String(rsgId || '').split(':');
     const guidePath = path.join(process.cwd(), 'refbank', 'guides', `${genre}_${mood}_v1.json`);
     const raw = await readFile(guidePath, 'utf8');
     return JSON.parse(raw);
@@ -55,18 +55,18 @@ async function mixdown(inputs, finalWav, finalMp3, guide) {
   const ins = inputs.filter(Boolean);
   if (!ins.length) throw new Error('No inputs to mix');
 
-  const I = guide?.mix_targets?.lufs_i ?? -12;
+  const I  = guide?.mix_targets?.lufs_i       ?? -12;
   const TP = guide?.mix_targets?.true_peak_db ?? -1.0;
+  const limit = Math.min(0.89, Math.pow(10, TP/20));
 
   await sh('ffmpeg', [
     '-y', ...ins.flatMap(f => ['-i', f]),
-    '-filter_complex', `amix=inputs=${ins.length}:normalize=0, loudnorm=I=${I}:TP=${TP}:LRA=7, alimiter=limit=${Math.min(0.89, 10 ** (TP/20))}`,
+    '-filter_complex', `amix=inputs=${ins.length}:normalize=0,loudnorm=I=${I}:TP=${TP}:LRA=7,alimiter=limit=${limit}`,
     '-c:a', 'pcm_s16le', finalWav
   ]);
   await sh('ffmpeg', ['-y', '-i', finalWav, '-c:a', 'libmp3lame', '-q:a', '2', finalMp3]);
   return { finalWav, finalMp3 };
 }
-
 
 function py(args, opts={}){
   return new Promise((resolve, reject)=>{
@@ -80,7 +80,11 @@ async function sliceStem(src, dest, start, duration){
   await sh('ffmpeg', ['-y', '-i', src, '-ss', String(start), '-t', String(duration), '-c:a', 'pcm_s16le', dest]);
 }
 
-export async function runFlip({ inputPath, genre, mood, intensity, prompt, vocal_pref = 'none', sessionDir, promptMapperUrl, requireSplit=false, strictNew=false }) {
+export async function runFlip({
+  inputPath, genre, mood, intensity, prompt,
+  vocal_pref = 'none', sessionDir, promptMapperUrl,
+  requireSplit=false, strictNew=false
+}) {
   await ensureSession(sessionDir);
   const inputWav = await convertToWav(inputPath, sessionDir);
 
@@ -88,22 +92,26 @@ export async function runFlip({ inputPath, genre, mood, intensity, prompt, vocal
   const fm = await fetch(`${promptMapperUrl}/map`, {
     method: 'POST', headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ prompt, genre, mood, intensity })
-  }).then(r => r.json()).catch(() => ({ rsg_id: `${genre}:${mood}:v1`, controls: { genre, mood, intensity }, refs_used: [] }));
+  }).then(r => r.json())
+    .catch(() => ({ rsg_id: `${genre}:${mood}:v1`, controls: { genre, mood, intensity }, refs_used: [] }));
 
   const guide = await loadGuide(fm.rsg_id);
   const stems = await splitDemucsRequired(inputWav, sessionDir, requireSplit);
 
   // compute sections from guide and total duration
   const totalSec = await ffprobeDuration(stems.drums || stems.mix || inputWav);
-  const sections = computeSections(guide, totalSec);
+  const sections = (computeSections(guide, totalSec) || []).length
+    ? computeSections(guide, totalSec)
+    : [{ start: 0, duration: totalSec }];
 
-  // intensity→mode
-  const mode = /^h/i.test(intensity) ? 'ultra' : /^l/i.test(intensity) ? 'raw' : 'studio';
+  // intensity→mode (accepts number or string)
+  const intenStr = typeof intensity === 'string' ? intensity : '';
+  const mode = /^h/i.test(intenStr) ? 'ultra' : /^l/i.test(intenStr) ? 'raw' : 'studio';
 
   // Section-wise processing
   const builtSections = [];
   for (const sec of sections){
-    const secDir = path.join(sessionDir, `sec_${Math.round(sec.start*1000)}`);
+    const secDir = path.join(sessionDir, `sec_${Math.round((sec.start||0)*1000)}`);
     await mkdir(secDir, { recursive: true });
 
     // slice stems
@@ -111,53 +119,52 @@ export async function runFlip({ inputPath, genre, mood, intensity, prompt, vocal
     for (const k of ['drums','bass','vox','other','mix']){
       if (!stems[k]) continue;
       const p = path.join(secDir, `${k}.wav`);
-      await sliceStem(stems[k], p, sec.start, sec.duration || 0.0001);
+      await sliceStem(stems[k], p, sec.start || 0, sec.duration || 0.0001);
       paths[k] = p;
     }
 
     // generate/transform
     let drumsPol = null;
     if (paths.drums){
-      // "strictNew" means ignore original audio content aside from analysis; here we always render new processed drums
       const { polPath } = await regenerateDrums(paths.drums, { mode });
       drumsPol = polPath;
     }
 
     // lane generators when intensity high or strictNew and Fluidsynth SF2 available
     const haveSf2 = !!process.env.FLUID_SF2;
-    if ((/^h/i.test(intensity) || strictNew) && haveSf2){
-      // DRUMS: generate 2-bar pattern and render
+    if ((/^h/i.test(intenStr) || strictNew) && haveSf2){
+      // DRUMS
       try{
         const drumMid = path.join(secDir, 'drums.mid');
-        await py(['services/adapters/drum_generate.py','--out_mid', drumMid, '--bars', String(Math.max(2, Math.round(sec.duration / (240/(guide?.bpm_target||120))*2))) ]);
+        const bars = Math.max(2, Math.round((sec.duration || 2) / (240/((guide?.bpm_target||120)))*2));
+        await py(['services/adapters/drum_generate.py','--out_mid', drumMid, '--bars', String(bars) ]);
         const drumNew = path.join(secDir, 'drums_new.wav');
         await py(['services/adapters/resynth_fluidsynth.py','--sf2', process.env.FLUID_SF2, '--mid', drumMid, '--out', drumNew]);
         drumsPol = drumNew;
-      }catch(e){ /* fallback to polished audio already computed */ }
-      // BASS: transcribe or synth
+      }catch(e){ /* fallback */ }
+      // BASS
       try{
         const bassMid = path.join(secDir, 'bass.mid');
         if (paths.bass){
           await py(['services/adapters/basic_pitch_to_midi.py','--audio', paths.bass, '--out_mid', bassMid]);
         } else {
-          // generate simple root motion bass from guide key (stub via melody gen with low octave will be done by SF2)
           await py(['services/adapters/melody_generate.py','--out_mid', bassMid, '--bars', '2', '--key', String(guide?.key_center||'C'), '--scale', String(guide?.scale||'aeolian')]);
         }
         const bassWav = path.join(secDir, 'bass_new.wav');
         await py(['services/adapters/resynth_fluidsynth.py','--sf2', process.env.FLUID_SF2, '--mid', bassMid, '--out', bassWav, '--gain','0.6']);
         paths.bass = bassWav;
       }catch(e){}
-      // MELODY/TOPLINE: synth lead
+      // MELODY/TOPLINE
       try{
         const melMid = path.join(secDir, 'mel.mid');
         await py(['services/adapters/melody_generate.py','--out_mid', melMid, '--bars', '2', '--key', String(guide?.key_center||'C'), '--scale', String(guide?.scale||'aeolian')]);
         const melWav = path.join(secDir, 'mel_new.wav');
         await py(['services/adapters/resynth_fluidsynth.py','--sf2', process.env.FLUID_SF2, '--mid', melMid, '--out', melWav, '--gain','0.5']);
-        paths.other = melWav; // replace "other" with generated lead for now
+        paths.other = melWav;
       }catch(e){}
     }
 
-    // others: placeholder pass-through (hook for MIDI/resynth later)
+    // others: placeholder pass-through
     const others = [];
     for (const k of ['bass','vox','other']) if (paths[k]) others.push(paths[k]);
 
@@ -171,14 +178,20 @@ export async function runFlip({ inputPath, genre, mood, intensity, prompt, vocal
 
   // Concat all section mixes to final
   const concatList = path.join(sessionDir, 'concat.txt');
-  await writeFile(concatList, builtSections.map(b=>`file '${b.secOut.replace(/'/g,"'\''")}'`).join('
-'));
+  await writeFile(concatList, builtSections.map(b => `file '${b.secOut.replace(/'/g, "'\\''")}'`).join('\n'));
+
   const finalPre = path.join(sessionDir, 'final_pre.wav');
   await sh('ffmpeg', ['-y','-f','concat','-safe','0','-i', concatList, '-c','copy', finalPre]);
 
   const finalWav = path.join(sessionDir, 'final.wav');
   const finalMp3 = path.join(sessionDir, 'final.mp3');
-  await mixdown([finalPre], finalWav, finalMp3, guide);
+
+  try {
+    await mixdown([finalPre], finalWav, finalMp3, guide);
+  } catch (e) {
+    // last-ditch: just encode MP3 if loudness step fails
+    await sh('ffmpeg', ['-y', '-i', finalPre, '-c:a', 'libmp3lame', '-q:a', '2', finalMp3]);
+  }
 
   // optional: ingest into sound bank
   try {
